@@ -60,6 +60,8 @@ func (s *server) handle(ctx context.Context, wg *sync.WaitGroup, c net.Conn, tra
 	defer func() {
 		if err := c.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to close listener connection: %v\n", err)
+		} else if s.verbose {
+			fmt.Fprintf(os.Stderr, "Close listener connection: %v %v\n", c.LocalAddr(), c.RemoteAddr())
 		}
 	}()
 
@@ -74,8 +76,14 @@ func (s *server) handle(ctx context.Context, wg *sync.WaitGroup, c net.Conn, tra
 	defer func() {
 		if err := t.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to close target connection: %v\n", err)
+		} else if s.verbose {
+			fmt.Fprintf(os.Stderr, "Close target connection: %v %v\n", t.LocalAddr(), t.RemoteAddr())
 		}
 	}()
+
+	if s.verbose {
+		fmt.Fprintf(os.Stderr, "Dial target: %v %v\n", t.LocalAddr(), t.RemoteAddr())
+	}
 
 	done := make(chan struct{})
 	iowg := &sync.WaitGroup{}
@@ -107,6 +115,8 @@ func (s *server) forward(ctx context.Context, l net.Listener, transport Transpor
 	defer func() {
 		if err := l.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to close net listener: %v\n", err)
+		} else if s.verbose {
+			fmt.Fprintln(os.Stderr, "Close net listener")
 		}
 	}()
 
@@ -143,6 +153,9 @@ func (s *server) forward(ctx context.Context, l net.Listener, transport Transpor
 		}
 		delay = 0
 
+		if s.verbose {
+			fmt.Fprintf(os.Stderr, "Accept connection: %v %v\n", c.LocalAddr(), c.RemoteAddr())
+		}
 		wg.Add(1)
 		go s.handle(ctx, wg, c, transport, target)
 	}
