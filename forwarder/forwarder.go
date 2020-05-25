@@ -112,22 +112,22 @@ func (s *server) forward(ctx context.Context, l net.Listener, transport Transpor
 	wg := &sync.WaitGroup{}
 	defer wg.Wait()
 
-	defer func() {
+	once := sync.Once{}
+	lclose := func() {
 		if err := l.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to close net listener: %v\n", err)
 		} else if s.verbose {
 			fmt.Fprintln(os.Stderr, "Close net listener")
 		}
+	}
+	defer once.Do(lclose)
+	go func() {
+		<-ctx.Done()
+		once.Do(lclose)
 	}()
 
 	var delay time.Duration
 	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-
 		c, err := l.Accept()
 		if err != nil {
 			select {
