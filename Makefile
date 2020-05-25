@@ -1,11 +1,9 @@
 .PHONY: all install
 
-MAIN_PATH=./cmd/main.go
-
 all: install
 
 install:
-	go install $(MAIN_PATH)
+	go install .
 
 .PHONY: test coverage bench fmt vet prepare
 
