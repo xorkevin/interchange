@@ -57,12 +57,27 @@ func ListenAndForwardUDP(ctx context.Context, port int, target string, verbose b
 func (s *server) handle(ctx context.Context, wg *sync.WaitGroup, c net.Conn, transport Transport, target string) {
 	defer wg.Done()
 
-	defer func() {
+	done := make(chan struct{})
+	dclose := func() {
+		close(done)
+	}
+	donce := &sync.Once{}
+
+	cclose := func() {
 		if err := c.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to close listener connection: %v\n", err)
 		} else if s.verbose {
 			fmt.Fprintf(os.Stderr, "Close listener connection: %v %v\n", c.LocalAddr(), c.RemoteAddr())
 		}
+	}
+	conce := &sync.Once{}
+	defer conce.Do(cclose)
+	go func() {
+		select {
+		case <-done:
+		case <-ctx.Done():
+		}
+		conce.Do(cclose)
 	}()
 
 	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -73,46 +88,47 @@ func (s *server) handle(ctx context.Context, wg *sync.WaitGroup, c net.Conn, tra
 		fmt.Fprintf(os.Stderr, "Failed to connect to target: %v\n", err)
 		return
 	}
-	defer func() {
+	tclose := func() {
 		if err := t.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to close target connection: %v\n", err)
 		} else if s.verbose {
 			fmt.Fprintf(os.Stderr, "Close target connection: %v %v\n", t.LocalAddr(), t.RemoteAddr())
 		}
+	}
+	tonce := &sync.Once{}
+	defer tonce.Do(tclose)
+	go func() {
+		select {
+		case <-done:
+		case <-ctx.Done():
+		}
+		tonce.Do(tclose)
 	}()
 
 	if s.verbose {
 		fmt.Fprintf(os.Stderr, "Dial target: %v %v\n", t.LocalAddr(), t.RemoteAddr())
 	}
 
-	done := make(chan struct{})
 	iowg := &sync.WaitGroup{}
 	iowg.Add(1)
 	go func() {
 		defer iowg.Done()
 		io.Copy(t, c)
+		donce.Do(dclose)
 	}()
 	iowg.Add(1)
 	go func() {
 		defer iowg.Done()
 		io.Copy(c, t)
+		donce.Do(dclose)
 	}()
-	go func() {
-		defer close(done)
-		iowg.Wait()
-	}()
-
-	select {
-	case <-done:
-	case <-ctx.Done():
-	}
+	iowg.Wait()
 }
 
 func (s *server) forward(ctx context.Context, l net.Listener, transport Transport, target string) error {
 	wg := &sync.WaitGroup{}
 	defer wg.Wait()
 
-	once := sync.Once{}
 	lclose := func() {
 		if err := l.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to close net listener: %v\n", err)
@@ -120,6 +136,7 @@ func (s *server) forward(ctx context.Context, l net.Listener, transport Transpor
 			fmt.Fprintln(os.Stderr, "Close net listener")
 		}
 	}
+	once := &sync.Once{}
 	defer once.Do(lclose)
 	go func() {
 		<-ctx.Done()
