@@ -103,20 +103,26 @@ func (s *server) handle(ctx context.Context, wg *sync.WaitGroup, c net.Conn, tra
 	go func() {
 		defer iowg.Done()
 		defer cancel()
-		if _, err := io.Copy(t, c); err != nil {
-			log.Printf("Error writing to target connection: %s %s: %v\n", t.LocalAddr(), t.RemoteAddr(), err)
-		} else if s.verbose {
-			log.Printf("Done writing to target connection: %s %s\n", t.LocalAddr(), t.RemoteAddr())
+		_, err := io.Copy(t, c)
+		if s.verbose {
+			if err != nil {
+				log.Printf("Error writing to target connection: %s %s: %v\n", t.LocalAddr(), t.RemoteAddr(), err)
+			} else {
+				log.Printf("Done writing to target connection: %s %s\n", t.LocalAddr(), t.RemoteAddr())
+			}
 		}
 	}()
 	iowg.Add(1)
 	go func() {
 		defer iowg.Done()
 		defer cancel()
-		if _, err := io.Copy(c, t); err != nil {
-			log.Printf("Error writing to listener connection: %s %s: %v\n", c.RemoteAddr(), c.LocalAddr(), err)
-		} else if s.verbose {
-			log.Printf("Done writing to listener connection: %s %s\n", c.RemoteAddr(), c.LocalAddr())
+		_, err := io.Copy(c, t)
+		if s.verbose {
+			if err != nil {
+				log.Printf("Error writing to listener connection: %s %s: %v\n", c.RemoteAddr(), c.LocalAddr(), err)
+			} else {
+				log.Printf("Done writing to listener connection: %s %s\n", c.RemoteAddr(), c.LocalAddr())
+			}
 		}
 	}()
 	<-copyCtx.Done()
