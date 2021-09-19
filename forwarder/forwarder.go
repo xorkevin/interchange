@@ -134,9 +134,9 @@ func (s *server) forward(ctx context.Context, l net.Listener, transport Transpor
 		}
 	}()
 
-	done := make(chan struct{})
+	wg.Add(1)
 	go func() {
-		defer close(done)
+		defer wg.Done()
 		var delay time.Duration
 		for {
 			select {
@@ -144,8 +144,15 @@ func (s *server) forward(ctx context.Context, l net.Listener, transport Transpor
 				return
 			default:
 			}
+
 			c, err := l.Accept()
 			if err != nil {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
 				if delay == 0 {
 					delay = 2 * time.Millisecond
 				} else {
@@ -172,7 +179,7 @@ func (s *server) forward(ctx context.Context, l net.Listener, transport Transpor
 			go s.handle(ctx, wg, c, transport, target)
 		}
 	}()
-	<-done
+	<-ctx.Done()
 }
 
 func (s *server) Forward(ctx context.Context, l net.Listener, target string) {
