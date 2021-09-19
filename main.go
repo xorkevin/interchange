@@ -1,9 +1,15 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	"xorkevin.dev/interchange/cmd"
 )
 
 func main() {
-	cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }

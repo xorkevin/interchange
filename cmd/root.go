@@ -3,10 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/pflag"
+	"log"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/spf13/pflag"
 	"xorkevin.dev/interchange/forwarder"
 )
 
@@ -18,7 +20,7 @@ var (
 	argHelp    bool
 )
 
-func Execute() {
+func Execute() error {
 	pflag.IntVarP(&argPort, "port", "p", 0, "listen port for traffic")
 	pflag.StringVarP(&argTarget, "target", "t", "", "destination port for traffic (HOST:PORT)")
 	pflag.BoolVarP(&argUdp, "udp", "u", false, "forward a udp port")
@@ -28,29 +30,28 @@ func Execute() {
 
 	if argHelp {
 		pflag.Usage()
-		return
+		return nil
 	}
 
 	if argPort == 0 {
-		fmt.Fprintln(os.Stderr, "source port not provided")
-		os.Exit(1)
+		return fmt.Errorf("Source port not provided")
 	}
-
 	if len(argTarget) == 0 {
-		fmt.Fprintln(os.Stderr, "target port not provided")
-		os.Exit(1)
+		return fmt.Errorf("Target port not provided")
 	}
 
 	transportString := "TCP"
 	if argUdp {
 		transportString = "UDP"
 	}
-	fmt.Printf("Forwarding %s port %d to %s\n", transportString, argPort, argTarget)
+	log.Printf("Forwarding %s port %d to %s\n", transportString, argPort, argTarget)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
+		defer close(done)
+		defer cancel()
 		if argUdp {
 			if err := forwarder.ListenAndForwardUDP(ctx, argPort, argTarget, argVerbose); err != nil {
 				fmt.Fprintln(os.Stderr, err)
@@ -60,16 +61,21 @@ func Execute() {
 				fmt.Fprintln(os.Stderr, err)
 			}
 		}
-		close(done)
 	}()
 
-	sigShutdown := make(chan os.Signal)
-	signal.Notify(sigShutdown, os.Interrupt)
-	<-sigShutdown
+	waitForInterrupt(ctx)
+	log.Println("Begin shutdown connections")
 	cancel()
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		fmt.Fprintln(os.Stderr, "Failed to close forwarder")
+		log.Printf("Failed to close forwarder\n")
 	}
+	return nil
+}
+
+func waitForInterrupt(ctx context.Context) {
+	notifyCtx, stop := signal.NotifyContext(ctx, os.Interrupt)
+	defer stop()
+	<-notifyCtx.Done()
 }
