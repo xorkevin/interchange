@@ -16,13 +16,11 @@ type (
 
 const (
 	TCP Transport = "tcp"
-	UDP Transport = "udp"
 )
 
 type (
 	Forwarder interface {
 		Forward(ctx context.Context, l net.Listener, target string)
-		ForwardUDP(ctx context.Context, l net.Listener, target string)
 	}
 
 	server struct {
@@ -42,21 +40,12 @@ func New(verbose bool) Forwarder {
 
 func ListenAndForward(ctx context.Context, port int, target string, verbose bool) error {
 	fwd := New(verbose)
-	l, err := net.Listen(string(TCP), fmt.Sprintf(":%d", port))
+	config := net.ListenConfig{}
+	l, err := config.Listen(ctx, string(TCP), fmt.Sprintf(":%d", port))
 	if err != nil {
 		return err
 	}
 	fwd.Forward(ctx, l, target)
-	return nil
-}
-
-func ListenAndForwardUDP(ctx context.Context, port int, target string, verbose bool) error {
-	fwd := New(verbose)
-	l, err := net.Listen(string(UDP), fmt.Sprintf(":%d", port))
-	if err != nil {
-		return err
-	}
-	fwd.ForwardUDP(ctx, l, target)
 	return nil
 }
 
@@ -190,8 +179,4 @@ func (s *server) forward(ctx context.Context, l net.Listener, transport Transpor
 
 func (s *server) Forward(ctx context.Context, l net.Listener, target string) {
 	s.forward(ctx, l, TCP, target)
-}
-
-func (s *server) ForwardUDP(ctx context.Context, l net.Listener, target string) {
-	s.forward(ctx, l, UDP, target)
 }

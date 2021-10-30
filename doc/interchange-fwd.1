@@ -22,16 +22,8 @@ Forwards tcp and udp traffic
 	help for fwd
 
 .PP
-\fB\-p\fP, \fB\-\-port\fP=0
-	listen port for traffic
-
-.PP
-\fB\-t\fP, \fB\-\-target\fP=""
-	destination port for traffic (HOST:PORT)
-
-.PP
-\fB\-u\fP, \fB\-\-udp\fP[=false]
-	forward a udp port
+\fB\-t\fP, \fB\-\-tcp\fP=[]
+	forward tcp ports (SRCPORT:TARGETHOST:TARGETPORT) may be specified multiple times
 
 .PP
 \fB\-v\fP, \fB\-\-verbose\fP[=false]

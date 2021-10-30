@@ -6,6 +6,9 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -17,10 +20,8 @@ var (
 	cfgFile   string
 	debugMode bool
 
-	fwdPort    int
-	fwdTarget  string
-	fwdUdp     bool
-	fwdVerbose bool
+	fwdTCPTargets []string
+	fwdVerbose    bool
 )
 
 var (
@@ -70,9 +71,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $XDG_CONFIG_HOME/.interchange.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&debugMode, "debug", false, "turn on debug output")
 
-	fwdCmd.PersistentFlags().IntVarP(&fwdPort, "port", "p", 0, "listen port for traffic")
-	fwdCmd.PersistentFlags().StringVarP(&fwdTarget, "target", "t", "", "destination port for traffic (HOST:PORT)")
-	fwdCmd.PersistentFlags().BoolVarP(&fwdUdp, "udp", "u", false, "forward a udp port")
+	fwdCmd.PersistentFlags().StringArrayVarP(&fwdTCPTargets, "tcp", "t", nil, "forward tcp ports (SRCPORT:TARGETHOST:TARGETPORT) may be specified multiple times")
 	fwdCmd.PersistentFlags().BoolVarP(&fwdVerbose, "verbose", "v", false, "enable verbose logging")
 
 	// Cobra also supports local flags, which will only run
@@ -108,35 +107,57 @@ func initConfig() {
 	}
 }
 
-func runInterchange() error {
-	if fwdPort == 0 {
-		return fmt.Errorf("Source port not provided")
+type (
+	fwdCmdTarget struct {
+		src    int
+		target string
 	}
-	if len(fwdTarget) == 0 {
-		return fmt.Errorf("Target port not provided")
-	}
+)
 
-	transportString := "TCP"
-	if fwdUdp {
-		transportString = "UDP"
+func runInterchange() error {
+	tcpTargets := make([]fwdCmdTarget, 0, len(fwdTCPTargets))
+	for _, i := range fwdTCPTargets {
+		parts := strings.SplitN(i, ":", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("Forward target must be in the form (SRCPORT:TARGETHOST:TARGETPORT)")
+		}
+		src, err := strconv.Atoi(parts[0])
+		if err != nil {
+			return fmt.Errorf("Invalid source port: %w", err)
+		}
+		if src == 0 {
+			return fmt.Errorf("Source port cannot be 0")
+		}
+		target := parts[1]
+		if len(target) == 0 {
+			return fmt.Errorf("Target not provided")
+		}
+		tcpTargets = append(tcpTargets, fwdCmdTarget{
+			src:    src,
+			target: target,
+		})
 	}
-	log.Printf("Forwarding %s port %d to %s\n", transportString, fwdPort, fwdTarget)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	wg := sync.WaitGroup{}
 	done := make(chan struct{})
+
+	for _, i := range tcpTargets {
+		k := i
+		log.Printf("Forwarding TCP port %d to %s\n", k.src, k.target)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer cancel()
+			if err := forwarder.ListenAndForward(ctx, k.src, k.target, fwdVerbose); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
+		}()
+	}
 	go func() {
 		defer close(done)
-		defer cancel()
-		if fwdUdp {
-			if err := forwarder.ListenAndForwardUDP(ctx, fwdPort, fwdTarget, fwdVerbose); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-			}
-		} else {
-			if err := forwarder.ListenAndForward(ctx, fwdPort, fwdTarget, fwdVerbose); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-			}
-		}
+		wg.Wait()
 	}()
 
 	waitForInterrupt(ctx)

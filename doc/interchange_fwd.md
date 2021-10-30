@@ -13,11 +13,9 @@ interchange fwd [flags]
 ### Options
 
 ```
-  -h, --help            help for fwd
-  -p, --port int        listen port for traffic
-  -t, --target string   destination port for traffic (HOST:PORT)
-  -u, --udp             forward a udp port
-  -v, --verbose         enable verbose logging
+  -h, --help              help for fwd
+  -t, --tcp stringArray   forward tcp ports (SRCPORT:TARGETHOST:TARGETPORT) may be specified multiple times
+  -v, --verbose           enable verbose logging
 ```
 
 ### Options inherited from parent commands
