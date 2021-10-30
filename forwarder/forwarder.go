@@ -250,6 +250,10 @@ func (l *udpListener) putBuffer(buffer []byte) {
 	l.buffers.Put(buffer)
 }
 
+func (l *udpListener) Close() error {
+	return l.l.Close()
+}
+
 func (l *udpListener) getConnLocked(addr net.Addr) (*udpConn, bool) {
 	c, ok := l.conns[addr.String()]
 	return c, ok
@@ -302,8 +306,49 @@ func (l *udpListener) Accept(ctx context.Context) (*udpConn, bool) {
 	}
 }
 
-func (l *udpListener) ReadFrom(buffer []byte) (int, net.Addr, error) {
-	return l.l.ReadFrom(buffer)
+func (l *udpListener) HandleReads(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		buffer := l.getBuffer()
+		n, addr, err := l.l.ReadFrom(buffer)
+		if err != nil {
+			l.putBuffer(buffer)
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+				log.Printf("Temporary network accept error: %v\n", err)
+			} else {
+				log.Printf("Network accept error: %v\n", err)
+			}
+			continue
+		}
+
+		c, ok := l.getConn(ctx, addr)
+		if !ok {
+			l.putBuffer(buffer)
+			return
+		}
+		select {
+		case <-c.done:
+			l.putBuffer(buffer)
+			continue
+		case c.read <- udpPacket{
+			buffer: buffer,
+			n:      n,
+		}:
+		}
+	}
 }
 
 func (c *udpConn) refreshLastUpdated() {
@@ -312,7 +357,7 @@ func (c *udpConn) refreshLastUpdated() {
 	c.lastUpdated = time.Now()
 }
 
-func (c *udpConn) isTimedout() bool {
+func (c *udpConn) IsTimedout() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return time.Now().After(c.lastUpdated.Add(5 * time.Second))
@@ -343,6 +388,14 @@ func (c *udpConn) Close() error {
 	return nil
 }
 
+func (c *udpConn) LocalAddr() net.Addr {
+	return c.l.l.LocalAddr()
+}
+
+func (c *udpConn) RemoteAddr() net.Addr {
+	return c.addr
+}
+
 func (s *server) handleUDP(ctx context.Context, wg *sync.WaitGroup, c *udpConn, transport Transport, target string) {
 	defer wg.Done()
 
@@ -351,9 +404,9 @@ func (s *server) handleUDP(ctx context.Context, wg *sync.WaitGroup, c *udpConn, 
 
 	defer func() {
 		if err := c.Close(); err != nil {
-			log.Printf("Failed to close listener connection: %s %s: %v\n", c.addr.String(), c.l.l.LocalAddr(), err)
+			log.Printf("Failed to close listener connection: %s %s: %v\n", c.RemoteAddr(), c.LocalAddr(), err)
 		} else if s.verbose {
-			log.Printf("Close listener connection: %s %s\n", c.addr.String(), c.l.l.LocalAddr())
+			log.Printf("Close listener connection: %s %s\n", c.RemoteAddr(), c.LocalAddr())
 		}
 	}()
 
@@ -396,9 +449,9 @@ func (s *server) handleUDP(ctx context.Context, wg *sync.WaitGroup, c *udpConn, 
 		_, err := io.Copy(c, t)
 		if s.verbose {
 			if err != nil {
-				log.Printf("Error writing to listener connection: %s %s: %v\n", c.addr.String(), c.l.l.LocalAddr(), err)
+				log.Printf("Error writing to listener connection: %s %s: %v\n", c.RemoteAddr(), c.LocalAddr(), err)
 			} else {
-				log.Printf("Done writing to listener connection: %s %s\n", c.addr.String(), c.l.l.LocalAddr())
+				log.Printf("Done writing to listener connection: %s %s\n", c.RemoteAddr(), c.LocalAddr())
 			}
 		}
 	}()
@@ -413,7 +466,7 @@ func (s *server) handleUDP(ctx context.Context, wg *sync.WaitGroup, c *udpConn, 
 			case <-copyCtx.Done():
 				return
 			case <-ticker.C:
-				if c.isTimedout() {
+				if c.IsTimedout() {
 					return
 				}
 			}
@@ -428,7 +481,7 @@ func (s *server) forwardUDP(ctx context.Context, nl net.PacketConn, transport Tr
 
 	l := newUDPListener(nl)
 	defer func() {
-		if err := l.l.Close(); err != nil {
+		if err := l.Close(); err != nil {
 			log.Printf("Failed to close net packet conn: %v\n", err)
 		} else if s.verbose {
 			log.Printf("Closed net packet conn\n")
@@ -436,51 +489,7 @@ func (s *server) forwardUDP(ctx context.Context, nl net.PacketConn, transport Tr
 	}()
 
 	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			buffer := l.getBuffer()
-			n, addr, err := l.ReadFrom(buffer)
-			if err != nil {
-				l.putBuffer(buffer)
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-
-				if ne, ok := err.(net.Error); ok && ne.Temporary() {
-					log.Printf("Temporary network accept error: %v\n", err)
-				} else {
-					log.Printf("Network accept error: %v\n", err)
-				}
-				continue
-			}
-
-			c, ok := l.getConn(ctx, addr)
-			if !ok {
-				l.putBuffer(buffer)
-				return
-			}
-			select {
-			case <-c.done:
-				l.putBuffer(buffer)
-				continue
-			case c.read <- udpPacket{
-				buffer: buffer,
-				n:      n,
-			}:
-			}
-		}
-	}()
-
+	go l.HandleReads(ctx, wg)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
