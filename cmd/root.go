@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -80,7 +80,7 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	//rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -166,8 +166,7 @@ func runInterchange() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	wg := sync.WaitGroup{}
-	done := make(chan struct{})
+	var wg sync.WaitGroup
 
 	for _, i := range tcpTargets {
 		k := i
@@ -193,24 +192,17 @@ func runInterchange() error {
 			}
 		}()
 	}
-	go func() {
-		defer close(done)
-		wg.Wait()
-	}()
 
 	waitForInterrupt(ctx)
+
 	log.Println("Begin shutdown connections")
 	cancel()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		log.Printf("Failed to close forwarder\n")
-	}
+	wg.Wait()
 	return nil
 }
 
 func waitForInterrupt(ctx context.Context) {
-	notifyCtx, stop := signal.NotifyContext(ctx, os.Interrupt)
+	notifyCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	<-notifyCtx.Done()
 }
