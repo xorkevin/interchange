@@ -3,26 +3,33 @@
 all: install
 
 install:
-	go install .
+	CGO_ENABLED=0 go install -trimpath -ldflags "-w -s" .
 
-.PHONY: test coverage bench fmt vet prepare
+TEST_ARGS?=
+TEST_PACKAGE?=./...
 
-COVERAGE=cover.out
-COVERAGE_ARGS=-covermode count -coverprofile $(COVERAGE)
+COVERAGE_OUT?=cover.out
+COVERAGE_HTML?=coverage.html
+
+COVERAGE_ARGS=-cover -covermode atomic -coverprofile $(COVERAGE_OUT)
+
+.PHONY: test testcover coverage cover
 
 test:
-	go test -v -cover $(COVERAGE_ARGS) ./...
+	go test -trimpath -ldflags "-w -s" -race $(TEST_ARGS) $(TEST_PACKAGE)
+
+testcover:
+	go test -trimpath -ldflags "-w -s" -race $(COVERAGE_ARGS) $(TEST_ARGS) $(TEST_PACKAGE)
 
 coverage:
-	go tool cover -html $(COVERAGE)
+	go tool cover -html $(COVERAGE_OUT) -o $(COVERAGE_HTML)
 
-BENCHMARK_ARGS=-benchtime 5s -benchmem
+cover: testcover coverage ## Test with coverage
 
-bench:
-	go test -bench . $(BENCHMARK_ARGS)
+.PHONY: fmt vet prepare
 
 fmt:
-	go fmt ./...
+	goimports -w .
 
 vet:
 	go vet ./...
