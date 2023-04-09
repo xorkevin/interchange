@@ -13,17 +13,17 @@ interchange fwd [flags]
 ### Options
 
 ```
-  -h, --help              help for fwd
-  -t, --tcp stringArray   forward tcp ports (SRCPORT:TARGETHOST:TARGETPORT); may be specified multiple times
-  -u, --udp stringArray   forward udp ports (SRCPORT:TARGETHOST:TARGETPORT); may be specified multiple times
-  -v, --verbose           enable verbose logging
+  -h, --help                   help for fwd
+  -t, --tcp stringArray        forward tcp ports (SRCPORT:TARGETHOST:TARGETPORT); may be specified multiple times
+      --tcp-timeout duration   tcp conn timeout (default 10s)
+  -u, --udp stringArray        forward udp ports (SRCPORT:TARGETHOST:TARGETPORT); may be specified multiple times
+      --udp-timeout duration   udp conn timeout (default 10s)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --config string   config file (default is $XDG_CONFIG_HOME/.interchange.yaml)
-      --debug           turn on debug output
+      --log-level string   log level (default "info")
 ```
 
 ### SEE ALSO

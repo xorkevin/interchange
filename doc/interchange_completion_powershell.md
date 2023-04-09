@@ -1,14 +1,14 @@
 ## interchange completion powershell
 
-generate the autocompletion script for powershell
+Generate the autocompletion script for powershell
 
 ### Synopsis
-
 
 Generate the autocompletion script for powershell.
 
 To load completions in your current shell session:
-PS C:\> interchange completion powershell | Out-String | Invoke-Expression
+
+	interchange completion powershell | Out-String | Invoke-Expression
 
 To load completions for every new session, add the output of the above command
 to your powershell profile.
@@ -28,11 +28,10 @@ interchange completion powershell [flags]
 ### Options inherited from parent commands
 
 ```
-      --config string   config file (default is $XDG_CONFIG_HOME/.interchange.yaml)
-      --debug           turn on debug output
+      --log-level string   log level (default "info")
 ```
 
 ### SEE ALSO
 
-* [interchange completion](interchange_completion.md)	 - generate the autocompletion script for the specified shell
+* [interchange completion](interchange_completion.md)	 - Generate the autocompletion script for the specified shell
 

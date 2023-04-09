@@ -1,9 +1,9 @@
 .nh
-.TH "interchange" "1" "Oct 2021" "" ""
+.TH "interchange" "1" "Apr 2023" "" ""
 
 .SH NAME
 .PP
-interchange\-fwd \- Forwards tcp and udp traffic
+interchange-fwd - Forwards tcp and udp traffic
 
 
 .SH SYNOPSIS
@@ -18,30 +18,30 @@ Forwards tcp and udp traffic
 
 .SH OPTIONS
 .PP
-\fB\-h\fP, \fB\-\-help\fP[=false]
+\fB-h\fP, \fB--help\fP[=false]
 	help for fwd
 
 .PP
-\fB\-t\fP, \fB\-\-tcp\fP=[]
+\fB-t\fP, \fB--tcp\fP=[]
 	forward tcp ports (SRCPORT:TARGETHOST:TARGETPORT); may be specified multiple times
 
 .PP
-\fB\-u\fP, \fB\-\-udp\fP=[]
+\fB--tcp-timeout\fP=10s
+	tcp conn timeout
+
+.PP
+\fB-u\fP, \fB--udp\fP=[]
 	forward udp ports (SRCPORT:TARGETHOST:TARGETPORT); may be specified multiple times
 
 .PP
-\fB\-v\fP, \fB\-\-verbose\fP[=false]
-	enable verbose logging
+\fB--udp-timeout\fP=10s
+	udp conn timeout
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
 .PP
-\fB\-\-config\fP=""
-	config file (default is $XDG\_CONFIG\_HOME/.interchange.yaml)
-
-.PP
-\fB\-\-debug\fP[=false]
-	turn on debug output
+\fB--log-level\fP="info"
+	log level
 
 
 .SH SEE ALSO

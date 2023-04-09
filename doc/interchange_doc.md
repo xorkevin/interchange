@@ -16,8 +16,7 @@ generate documentation for interchange in several formats
 ### Options inherited from parent commands
 
 ```
-      --config string   config file (default is $XDG_CONFIG_HOME/.interchange.yaml)
-      --debug           turn on debug output
+      --log-level string   log level (default "info")
 ```
 
 ### SEE ALSO

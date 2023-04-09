@@ -9,14 +9,13 @@ A tcp and udp forwarder
 ### Options
 
 ```
-      --config string   config file (default is $XDG_CONFIG_HOME/.interchange.yaml)
-      --debug           turn on debug output
-  -h, --help            help for interchange
+  -h, --help               help for interchange
+      --log-level string   log level (default "info")
 ```
 
 ### SEE ALSO
 
-* [interchange completion](interchange_completion.md)	 - generate the autocompletion script for the specified shell
+* [interchange completion](interchange_completion.md)	 - Generate the autocompletion script for the specified shell
 * [interchange doc](interchange_doc.md)	 - generate documentation for interchange
 * [interchange fwd](interchange_fwd.md)	 - Forwards tcp and udp traffic
 
