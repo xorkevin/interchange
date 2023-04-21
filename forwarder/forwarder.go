@@ -150,6 +150,17 @@ func (s *server) handle(ctx context.Context, wg *sync.WaitGroup, c net.Conn, tar
 	<-fwdCtx.Done()
 }
 
+func timeAfter(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("Context closed: %w", context.Cause(ctx))
+	case <-t.C:
+		return nil
+	}
+}
+
 func (s *server) Forward(ctx context.Context, l net.Listener, target string) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -179,12 +190,9 @@ func (s *server) Forward(ctx context.Context, l net.Listener, target string) {
 			if err != nil {
 				s.log.Err(ctx, kerrors.WithMsg(err, "Listener accept error"))
 				s.log.Debug(ctx, "Backing off", klog.ADuration("delay", delay))
-				select {
-				case <-ctx.Done():
+				if err := timeAfter(ctx, delay); err != nil {
 					return
-				case <-time.After(delay):
 				}
-
 				delay = min(delay*2, listenMaxDelay)
 				continue
 			}
