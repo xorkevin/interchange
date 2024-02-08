@@ -66,7 +66,6 @@ func (c *Cmd) execFwdCmd(cmd *cobra.Command, args []string) {
 	var wg sync.WaitGroup
 
 	for _, i := range tcpTargets {
-		i := i
 		log.Printf("Forwarding TCP port %d to %s\n", i.src, i.target)
 		wg.Add(1)
 		go func() {
@@ -84,7 +83,6 @@ func (c *Cmd) execFwdCmd(cmd *cobra.Command, args []string) {
 		}()
 	}
 	for _, i := range udpTargets {
-		i := i
 		log.Printf("Forwarding UDP port %d to %s\n", i.src, i.target)
 		wg.Add(1)
 		go func() {
